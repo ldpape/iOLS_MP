@@ -1,7 +1,7 @@
 ********************************************** unique.pkg
 v 1
-d iOLS_OLS 
-d Program to run small sample iOLS
+d iOLS_U 
+d Program to run multiplicative poisson by iOLS
 d Distribution-Date: 22 March 2021
-f iOLS_OLS.ado
-f iOLS_OLS.sthlp
+f iOLS_U.ado
+f iOLS_U.sthlp
