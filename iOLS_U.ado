@@ -5,9 +5,11 @@
 ** 14/12/2021 : Changed the constant calculation to avoid numerical log(0).
 ** 21/12/2021 : Updated to matrix form for speed and options to control convergence.
 ** 04/01/2021 : Add additional stopping criteria + return of the constant alpha.
-cap program drop iOLS_OLS
-program define iOLS_OLS, eclass 
-	syntax [anything] [if] [in] [aweight pweight fweight iweight] [, DELta(real 1) Robust LIMit(real 0.00001) MAXimum(real 1000) CLuster(varlist numeric)]
+** 05/01/2021 : Created iOLS_U
+
+cap program drop iOLS_U
+program define iOLS_U, eclass 
+	syntax [anything] [if] [in] [aweight pweight fweight iweight] [, DELta(real 0) Robust LIMit(real 0.00001) MAXimum(real 1000) CLuster(varlist numeric)]
 	marksample touse
 	preserve
 	quietly keep if `touse'
@@ -40,6 +42,14 @@ program define iOLS_OLS, eclass
 	mata : beta_initial = invXX*cross(X,y_tilde)
 	mata : beta_t_1 = beta_initial // needed to initialize
 	mata : beta_t_2 = beta_initial // needed to initialize
+	** initialize delta path
+	mata: scale_scalar = max(y:*exp(-X*beta_initial))
+	if `delta'==0{
+	mata : delta= 0.01*scale_scalar // max((`delta', 0.5*scale_scalar ))
+	}
+	else{
+	mata: delta = `delta'
+	}
 	mata : q_hat_m0 = 0
 	local k = 1
 	local eps = 1000	
@@ -47,11 +57,11 @@ program define iOLS_OLS, eclass
 	*** ItÃ©rations iOLS
 	_dots 0
 	while ( (`k' < `maximum') & (`eps' > `limit') ) {
-	mata: alpha = log(mean(y:*exp(-X[.,1..(cols(X)-1)]*beta_initial[1..(cols(X)-1),1])))
-	mata : beta_initial[(cols(X)),1] = alpha
+	*mata: alpha = log(mean(y:*exp(-X[.,1..(cols(X)-1)]*beta_initial[1..(cols(X)-1),1])))
+	*mata : beta_initial[(cols(X)),1] = alpha
 	mata: xb_hat = X*beta_initial
 		* Update d'un nouveau y_tild et regression avec le nouvel y_tild
-	mata: y_tilde = log(y + `delta'*exp(xb_hat)) :-mean(log(y + `delta'*exp(xb_hat))- xb_hat)
+	mata: y_tilde = log(y + delta*exp(xb_hat)) :- (log(delta :+ y:*exp(-xb_hat)) :- ((y:*exp(-xb_hat) :- 1):/(1:+delta)))
 		* 2SLS 
 	mata: beta_new = invXX*cross(X,y_tilde)
 		* Difference entre les anciens betas et les nouveaux betas
@@ -77,12 +87,14 @@ mata: st_local("eps", strofreal(criteria))
 	mata: st_local("check_3", strofreal(check_3))
 	mata: q_hat_m0 = q_hat_m
 		if ((`check_1'<1e-4)&(`check_2'>1e-2)) {
-di "delta is too small to achieve convergence -- update to larger value"
-	local k = `maximum'
+di "delta is too small to achieve convergence -- updating to larger value"
+	*local k = `maximum'
+	mata : delta = delta + 0.66*scale_scalar
 		}
 		if ((`check_3'>0.5) & (`k'>500)) {
-	local k = `maximum'
-di "q_hat too far from 1"
+*	local k = `maximum'
+di "q_hat too far from 1: updating to larger value"
+mata : delta = delta+ 0.66*scale_scalar
 		}
 					  }
 	}
@@ -98,9 +110,9 @@ mata: beta_initial = beta_new
 	*** Calcul de la bonne matrice de variance-covariance
 	* Calcul du "bon" rÃ©sidu
 	mata: xb_hat = X*beta_new
-	mata : y_tilde = log(y + `delta'*exp(xb_hat)) :-mean(log(y + `delta'*exp(xb_hat)) - xb_hat)
+	mata: y_tilde = log(y + delta*exp(xb_hat)) :- (log(delta :+ y:*exp(-xb_hat)) :- ((y:*exp(-xb_hat) :- 1):/(1:+delta)))
 	mata: ui = y:*exp(-xb_hat)
-	mata: ui = ui:/(`delta' :+ ui)
+	mata: ui = ui:/(delta :+ ui)
 	* Retour en Stata 
 	cap drop y_tild 
 	quietly mata: st_addvar("double", "y_tild")
@@ -113,19 +125,23 @@ mata: beta_initial = beta_new
 	mata : invXpIWX = invsym(cross(X, ui, X))  
 	mata : Sigma_tild = invXpIWX*Sigma_0*invXpIWX
     mata: st_matrix("Sigma_tild", Sigma_tild)
+	mata: st_numscalar("delta", delta)
+mata: st_local("delta", strofreal(delta))
 	*** Stocker les resultats dans une matrice
 	local names : colnames e(b)
 	local nbvar : word count `names'
 	mat rownames Sigma_tild = `names' 
     mat colnames Sigma_tild = `names' 
-    ereturn post beta_final Sigma_tild , obs(`=r(N)') depname(`depvar') esample(`touse')  dof(`=r(df r)') 
+    ereturn post beta_final Sigma_tild , obs(`=e(N)') depname(`depvar') esample(`touse')  dof(`=r(df r)') 
 	restore 
 ereturn scalar delta = `delta'
 ereturn  scalar eps =   `eps'
 ereturn  scalar niter =  `k'
-ereturn local cmd "iOLS"
+ereturn local cmd "iOLS_U"
 ereturn local vcetype `option'
 di in gr _col(55) "Number of obs = " in ye %8.0f e(N)
+di in gr _col(55) "delta of conv = " in ye %8.0f delta
 ereturn display
+
 end
 
