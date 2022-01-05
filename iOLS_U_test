@@ -22,12 +22,11 @@ program define iOLS_U_test, eclass
          predict xb_temp, xb
          gen lhs_temp = `depvar'*exp(-xb_temp)
          * rhs of test
-         gen temp = log(`depvar' + `delta'*exp(xb_temp)) - xb_temp
-		 cap drop xb_temp
-         egen c_hat_temp = mean(temp)
+		 cap drop mean_U
+         egen mean_U = mean(lhs_temp)
          logit dep_pos `indepvar'
          predict p_hat_temp, pr
-         gen lambda = (c_hat_temp-log(`delta'))/p_hat_temp
+         gen lambda = (mean_U)/p_hat_temp
          * run the test
          reg lhs_temp lambda if dep_pos, nocons
          matrix b = e(b)
