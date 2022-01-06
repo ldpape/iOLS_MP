@@ -113,7 +113,7 @@ mata: beta_initial = beta_new
 	mata: xb_hat = X*beta_new
 	mata: y_tilde = log(y + delta*exp(xb_hat)) :- (log(delta :+ y:*exp(-xb_hat)) :- ((y:*exp(-xb_hat) :- 1):/(1:+delta)))
 	mata: ui = y:*exp(-xb_hat)
-	mata: ui = ui:/(delta :+ ui)
+	mata: ui = ui:/(delta :+ 1)
 	* Retour en Stata 
 	cap drop y_tild 
 	quietly mata: st_addvar("double", "y_tild")
