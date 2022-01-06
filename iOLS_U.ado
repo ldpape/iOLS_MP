@@ -92,7 +92,7 @@ di "delta is too small to achieve convergence -- updating to larger value"
 	*local k = `maximum'
 	mata : delta = delta + 0.66*scale_scalar
 		}
-		if ((`check_3'>0.5) & (`k'>500)) {
+		if ((`check_3'>0.5) & (`k'>50)) {
 *	local k = `maximum'
 di "q_hat too far from 1: updating to larger value"
 mata : delta = delta+ 0.66*scale_scalar
