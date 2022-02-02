@@ -120,24 +120,28 @@ mata: st_local("eps", strofreal(criteria))
 	if `k'>4{
 	mata: q_hat[`k',1] = mean(log( abs(beta_new-beta_initial):/abs(beta_initial-beta_t_2)):/log(abs(beta_initial-beta_t_2):/abs(beta_t_2-beta_t_3)))	
 	mata: check_3 = abs(mean(q_hat)-1)
-		if mod(`k'-4,50)==0{
-    mata: q_hat_m =  mm_median(q_hat[((`k'-49)..`k'),.] ,1)
+	if mod(`k'-4,50)==0{
+*	mata: if (hasmissing(q_hat[((`k'-49)..`k'),.])==0) q_hat_m=mm_median(q_hat[((`k'-49)..`k'),.] ,1) ;;
+	mata: q_hat_m=mm_median(select(q_hat[((`k'-49)..`k'),.],rowmissing(q_hat[((`k'-49)..`k'),.]):==0) ,1)
 	mata: check_1 = abs(q_hat_m - q_hat_m0)
 	mata: check_2 = abs(q_hat_m-1)
+	mata: q_hat_m0 = q_hat_m ;;
 	mata: st_numscalar("check_1", check_1)
 	mata: st_local("check_1", strofreal(check_1))
 	mata: st_numscalar("check_2", check_2)
 	mata: st_local("check_2", strofreal(check_2))
 	mata: st_numscalar("check_3", check_3)
 	mata: st_local("check_3", strofreal(check_3))
-	mata: q_hat_m0 = q_hat_m
 		if ((`check_1'<1e-4)&(`check_2'>1e-2)) {
-mata : delta = delta + 0.66*scale_scalar
-	local k = `maximum'
+di "delta is too small to achieve convergence -- updating to larger value"
+	*local k = `maximum'
+	mata : delta = delta + 0.66*scale_scalar
 		}
-		if ((`check_3'>0.5) & (`k'>500)) {
+		if ((`check_3'>0.5) & (`k'>50)) {
 *	local k = `maximum'
-mata : delta = delta + 0.66*scale_scalar		}
+di "q_hat too far from 1: updating to larger value"
+mata : delta = delta+ 0.66*scale_scalar
+		}
 					  }
 	}
 	if `k'>2 { // keep in memory the previous beta_hat for q_hat 
